@@ -18,14 +18,33 @@ const client = new MongoClient(uri, {
 
 const runMongo = async () => {
   try {
-    client.connect();
+    await client.connect();
     const serviceCollection = client.db('doctorsportal').collection('services');
+    const bookingCollection = client.db('doctorsportal').collection('bookings');
 
+    // Get all Services
     app.get('/services', async (req, res) => {
       const query = {};
       const cursor = serviceCollection.find(query);
-      const result = await cursor.toArray();
-      res.send(result);
+      const services = await cursor.toArray();
+      res.send(services);
+    });
+
+    // Post booking
+    app.post('/booking', async (req, res) => {
+      const booking = req.body;
+      const query = {
+        treatmentId: booking.treatmentId,
+        patientEmail: booking.patientEmail,
+        date: booking.date,
+      };
+      const exists = await bookingCollection.findOne(query);
+      if (exists) {
+        return res.send({ status: false, booking: exists });
+      } else {
+        const result = await bookingCollection.insertOne(booking);
+        return res.send({ status: true, result });
+      }
     });
   } finally {
   }
