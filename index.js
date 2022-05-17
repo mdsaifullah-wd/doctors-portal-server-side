@@ -9,6 +9,21 @@ const port = process.env.PORT || 3001;
 app.use(express.json());
 app.use(cors());
 
+const verifyToken = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) {
+    return res.status(401).send({ message: 'Unauthorized Access' });
+  }
+  const token = authHeader.split(' ')[1];
+  jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+    if (err) {
+      return res.status(403).send({ message: 'Forbidden Access' });
+    }
+    req.decoded = decoded;
+    next();
+  });
+};
+
 const uri = `mongodb+srv://${process.env.USER_ID}:${process.env.USER_PASSWORD}@cluster0.tzbrj.mongodb.net/myFirstDatabase?retryWrites=true&w=majority`;
 const client = new MongoClient(uri, {
   useNewUrlParser: true,
@@ -63,13 +78,18 @@ const runMongo = async () => {
       }
     });
 
-    // Get booking
-    app.get('/booking', async (req, res) => {
+    // Get Appointment/Booking
+    app.get('/booking', verifyToken, async (req, res) => {
+      const decodedEmail = req.decoded.email;
       const patient = req.query.patient;
-      const bookings = await bookingCollection
-        .find({ patientEmail: patient })
-        .toArray();
-      res.send(bookings);
+      if (patient === decodedEmail) {
+        const bookings = await bookingCollection
+          .find({ patientEmail: patient })
+          .toArray();
+        return res.send(bookings);
+      } else {
+        return res.status(403).send({ message: 'Forbidden Access!' });
+      }
     });
 
     // Update User
@@ -87,6 +107,38 @@ const runMongo = async () => {
         expiresIn: '1h',
       });
       res.send({ result, token });
+    });
+
+    // Get All Users
+    app.get('/user', verifyToken, async (req, res) => {
+      const result = await userCollection.find().toArray();
+      res.send(result);
+    });
+
+    // Make Admin
+    app.put('/admin/:email', async (req, res) => {
+      const email = req.params.email;
+      const filter = { email: email };
+      const updateDoc = {
+        $set: {
+          role: 'admin',
+        },
+      };
+      const result = userCollection.updateOne(filter, updateDoc);
+      res.send(result);
+    });
+
+    // Remove Admin
+    app.put('/admin/remove/:email', async (req, res) => {
+      const email = req.params.email;
+      const filter = { email: email };
+      const updateDoc = {
+        $set: {
+          role: 'user',
+        },
+      };
+      const result = userCollection.updateOne(filter, updateDoc);
+      res.send(result);
     });
   } finally {
   }
