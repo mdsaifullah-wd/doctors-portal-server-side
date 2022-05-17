@@ -61,6 +61,15 @@ const runMongo = async () => {
         return res.send({ status: true, result });
       }
     });
+
+    // Get booking
+    app.get('/booking', async (req, res) => {
+      const patient = req.query.patient;
+      const bookings = await bookingCollection
+        .find({ patientEmail: patient })
+        .toArray();
+      res.send(bookings);
+    });
   } finally {
   }
 };
