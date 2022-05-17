@@ -115,30 +115,54 @@ const runMongo = async () => {
       res.send(result);
     });
 
-    // Make Admin
-    app.put('/admin/:email', async (req, res) => {
+    // Is Admin?
+    app.get('/user/admin/:email', verifyToken, async (req, res) => {
       const email = req.params.email;
-      const filter = { email: email };
-      const updateDoc = {
-        $set: {
-          role: 'admin',
-        },
-      };
-      const result = userCollection.updateOne(filter, updateDoc);
-      res.send(result);
+      const user = await userCollection.findOne({ email: email });
+      const isAdmin = user.role === 'admin';
+      res.send(isAdmin);
+    });
+
+    // Make Admin
+    app.put('/admin/add/:email', verifyToken, async (req, res) => {
+      const requester = req.decoded.email;
+      const requesterDetails = await userCollection.findOne({
+        email: requester,
+      });
+      if (requesterDetails.role === 'admin') {
+        const email = req.params.email;
+        const filter = { email: email };
+        const updateDoc = {
+          $set: {
+            role: 'admin',
+          },
+        };
+        const result = await userCollection.updateOne(filter, updateDoc);
+        res.send(result);
+      } else {
+        res.status(403).send({ message: 'Forbidden Access' });
+      }
     });
 
     // Remove Admin
-    app.put('/admin/remove/:email', async (req, res) => {
-      const email = req.params.email;
-      const filter = { email: email };
-      const updateDoc = {
-        $set: {
-          role: 'user',
-        },
-      };
-      const result = userCollection.updateOne(filter, updateDoc);
-      res.send(result);
+    app.put('/admin/remove/:email', verifyToken, async (req, res) => {
+      const requester = req.decoded.email;
+      const requesterDetails = await userCollection.findOne({
+        email: requester,
+      });
+      if (requesterDetails.role === 'admin') {
+        const email = req.params.email;
+        const filter = { email: email };
+        const updateDoc = {
+          $set: {
+            role: 'user',
+          },
+        };
+        const result = await userCollection.updateOne(filter, updateDoc);
+        res.send(result);
+      } else {
+        res.status(403).send({ message: 'Forbidden Access' });
+      }
     });
   } finally {
   }
