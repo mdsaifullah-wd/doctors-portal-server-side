@@ -21,6 +21,7 @@ const runMongo = async () => {
     await client.connect();
     const serviceCollection = client.db('doctorsportal').collection('services');
     const bookingCollection = client.db('doctorsportal').collection('bookings');
+    const userCollection = client.db('doctorsportal').collection('users');
 
     // Get all Services
     app.get('/services', async (req, res) => {
@@ -69,6 +70,20 @@ const runMongo = async () => {
         .find({ patientEmail: patient })
         .toArray();
       res.send(bookings);
+    });
+
+    // Update User
+    app.put('/user/:email', async (req, res) => {
+      const email = req.params.email;
+      const user = req.body;
+      const filter = { email: email };
+      const options = { upsert: true };
+      const updateDoc = {
+        $set: user,
+      };
+
+      const result = await userCollection.updateOne(filter, updateDoc, options);
+      res.send(result);
     });
   } finally {
   }
