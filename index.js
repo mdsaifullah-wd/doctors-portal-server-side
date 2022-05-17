@@ -30,6 +30,21 @@ const runMongo = async () => {
       res.send(services);
     });
 
+    // Available Services
+    app.get('/available', async (req, res) => {
+      const date = req.query.date;
+      const services = await serviceCollection.find().toArray();
+      const bookings = await bookingCollection.find({ date }).toArray();
+      services.forEach((service) => {
+        const serviceBookings = bookings.filter(
+          (booking) => booking.treatment === service.name
+        );
+        const booked = serviceBookings.map((booking) => booking.slot);
+        service.slots = service.slots.filter((slot) => !booked.includes(slot));
+      });
+      res.send(services);
+    });
+
     // Post booking
     app.post('/booking', async (req, res) => {
       const booking = req.body;
