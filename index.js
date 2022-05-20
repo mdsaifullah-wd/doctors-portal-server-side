@@ -1,9 +1,9 @@
-const express = require('express');
-const cors = require('cors');
-require('dotenv').config();
+const express = require("express");
+const cors = require("cors");
+require("dotenv").config();
 const app = express();
-const { MongoClient, ServerApiVersion } = require('mongodb');
-const jwt = require('jsonwebtoken');
+const { MongoClient, ServerApiVersion } = require("mongodb");
+const jwt = require("jsonwebtoken");
 const port = process.env.PORT || 3001;
 
 app.use(express.json());
@@ -12,12 +12,12 @@ app.use(cors());
 const verifyToken = (req, res, next) => {
   const authHeader = req.headers.authorization;
   if (!authHeader) {
-    return res.status(401).send({ message: 'Unauthorized Access' });
+    return res.status(401).send({ message: "Unauthorized Access" });
   }
-  const token = authHeader.split(' ')[1];
+  const token = authHeader.split(" ")[1];
   jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
     if (err) {
-      return res.status(403).send({ message: 'Forbidden Access' });
+      return res.status(403).send({ message: "Forbidden Access" });
     }
     req.decoded = decoded;
     next();
@@ -34,12 +34,23 @@ const client = new MongoClient(uri, {
 const runMongo = async () => {
   try {
     await client.connect();
-    const serviceCollection = client.db('doctorsportal').collection('services');
-    const bookingCollection = client.db('doctorsportal').collection('bookings');
-    const userCollection = client.db('doctorsportal').collection('users');
+    const serviceCollection = client.db("doctorsportal").collection("services");
+    const bookingCollection = client.db("doctorsportal").collection("bookings");
+    const userCollection = client.db("doctorsportal").collection("users");
+
+    // Verify Admin
+    const verifyAdmin = async (req, res, next) => {
+      const email = req.decoded.email;
+      const user = await userCollection.findOne({ email: email });
+      if (user.role === "admin") {
+        next();
+      } else {
+        return res.status(403).send({ message: "Forbidden Access" });
+      }
+    };
 
     // Get all Services
-    app.get('/services', async (req, res) => {
+    app.get("/services", async (req, res) => {
       const query = {};
       const cursor = serviceCollection.find(query);
       const services = await cursor.toArray();
@@ -47,7 +58,7 @@ const runMongo = async () => {
     });
 
     // Available Services
-    app.get('/available', async (req, res) => {
+    app.get("/available", async (req, res) => {
       const date = req.query.date;
       const services = await serviceCollection.find().toArray();
       const bookings = await bookingCollection.find({ date }).toArray();
@@ -62,7 +73,7 @@ const runMongo = async () => {
     });
 
     // Post booking
-    app.post('/booking', async (req, res) => {
+    app.post("/booking", async (req, res) => {
       const booking = req.body;
       const query = {
         treatmentId: booking.treatmentId,
@@ -79,7 +90,7 @@ const runMongo = async () => {
     });
 
     // Get Appointment/Booking
-    app.get('/booking', verifyToken, async (req, res) => {
+    app.get("/booking", verifyToken, async (req, res) => {
       const decodedEmail = req.decoded.email;
       const patient = req.query.patient;
       if (patient === decodedEmail) {
@@ -88,12 +99,12 @@ const runMongo = async () => {
           .toArray();
         return res.send(bookings);
       } else {
-        return res.status(403).send({ message: 'Forbidden Access!' });
+        return res.status(403).send({ message: "Forbidden Access!" });
       }
     });
 
     // Update User
-    app.put('/user/:email', async (req, res) => {
+    app.put("/user/:email", async (req, res) => {
       const email = req.params.email;
       const user = req.body;
       const filter = { email: email };
@@ -104,64 +115,61 @@ const runMongo = async () => {
 
       const result = await userCollection.updateOne(filter, updateDoc, options);
       const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
-        expiresIn: '1h',
+        expiresIn: "1h",
       });
       res.send({ result, token });
     });
 
     // Get All Users
-    app.get('/user', verifyToken, async (req, res) => {
+    app.get("/user", verifyToken, verifyAdmin, async (req, res) => {
       const result = await userCollection.find().toArray();
       res.send(result);
     });
 
     // Is Admin?
-    app.get('/user/admin/:email', verifyToken, async (req, res) => {
-      const email = req.params.email;
-      const user = await userCollection.findOne({ email: email });
-      const isAdmin = user.role === 'admin';
-      res.send(isAdmin);
+    app.get("/user/admin", verifyToken, verifyAdmin, (req, res) => {
+      res.status(200).send({ admin: true });
     });
 
     // Make Admin
-    app.put('/admin/add/:email', verifyToken, async (req, res) => {
+    app.put("/admin/add/:email", verifyToken, async (req, res) => {
       const requester = req.decoded.email;
       const requesterDetails = await userCollection.findOne({
         email: requester,
       });
-      if (requesterDetails.role === 'admin') {
+      if (requesterDetails.role === "admin") {
         const email = req.params.email;
         const filter = { email: email };
         const updateDoc = {
           $set: {
-            role: 'admin',
+            role: "admin",
           },
         };
         const result = await userCollection.updateOne(filter, updateDoc);
         res.send(result);
       } else {
-        res.status(403).send({ message: 'Forbidden Access' });
+        res.status(403).send({ message: "Forbidden Access" });
       }
     });
 
     // Remove Admin
-    app.put('/admin/remove/:email', verifyToken, async (req, res) => {
+    app.put("/admin/remove/:email", verifyToken, async (req, res) => {
       const requester = req.decoded.email;
       const requesterDetails = await userCollection.findOne({
         email: requester,
       });
-      if (requesterDetails.role === 'admin') {
+      if (requesterDetails.role === "admin") {
         const email = req.params.email;
         const filter = { email: email };
         const updateDoc = {
           $set: {
-            role: 'user',
+            role: "user",
           },
         };
         const result = await userCollection.updateOne(filter, updateDoc);
         res.send(result);
       } else {
-        res.status(403).send({ message: 'Forbidden Access' });
+        res.status(403).send({ message: "Forbidden Access" });
       }
     });
   } finally {
@@ -169,10 +177,10 @@ const runMongo = async () => {
 };
 runMongo().catch(console.error);
 
-app.get('/', (req, res) => {
-  res.send('Test');
+app.get("/", (req, res) => {
+  res.send("Test");
 });
 
 app.listen(port, () => {
-  console.log('Server is running...');
+  console.log("Server is running...");
 });
