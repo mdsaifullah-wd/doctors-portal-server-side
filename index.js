@@ -37,6 +37,7 @@ const runMongo = async () => {
     const serviceCollection = client.db("doctorsportal").collection("services");
     const bookingCollection = client.db("doctorsportal").collection("bookings");
     const userCollection = client.db("doctorsportal").collection("users");
+    const doctorCollection = client.db("doctorsportal").collection("doctors");
 
     // Verify Admin
     const verifyAdmin = async (req, res, next) => {
@@ -49,10 +50,13 @@ const runMongo = async () => {
       }
     };
 
-    // Get all Services
+    // Get only Service Name
     app.get("/services", async (req, res) => {
       const query = {};
-      const cursor = serviceCollection.find(query);
+      const options = {
+        projection: { name: 1 },
+      };
+      const cursor = serviceCollection.find(query, options);
       const services = await cursor.toArray();
       res.send(services);
     });
@@ -171,6 +175,13 @@ const runMongo = async () => {
       } else {
         res.status(403).send({ message: "Forbidden Access" });
       }
+    });
+
+    // Add doctor
+    app.post("/doctor", verifyToken, verifyAdmin, async (req, res) => {
+      const doctor = req.body;
+      const result = await doctorCollection.insertOne(doctor);
+      res.send(result);
     });
   } finally {
   }
